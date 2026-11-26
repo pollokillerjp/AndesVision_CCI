@@ -12,9 +12,6 @@ B_KS = 200       # réplicas del bootstrap del KS en C2
 R_MC = 100_000   # réplicas de la simulación en C4
 
 
-# ---------------------------------------------------------------------------
-# log-verosimilitudes (con signo menos, para minimizar)
-# ---------------------------------------------------------------------------
 def nll_gamma(par, x):
     k, th = par
     if k <= 0 or th <= 0:
@@ -54,8 +51,11 @@ def ajustar_emv(nll, x, inicio, positivos):
     se optimizan en logaritmo. Devuelve (estimación, errores estándar, logL máxima)."""
     positivos = np.asarray(positivos)
     def a_natural(u):
-        u = np.array(u, float); u[positivos] = np.exp(u[positivos]); return u
-    u0 = np.array(inicio, float); u0[positivos] = np.log(u0[positivos])
+        u = np.array(u, float)
+        u[positivos] = np.exp(u[positivos])
+        return u
+    u0 = np.array(inicio, float)
+    u0[positivos] = np.log(u0[positivos])
     res = optimize.minimize(lambda u: nll(a_natural(u), x), u0, method="Nelder-Mead",
                             options={"xatol": 1e-9, "fatol": 1e-9, "maxiter": 20000})
     est = a_natural(res.x)
@@ -79,9 +79,6 @@ def bloques_reales(datos, n_bloque):
     return np.concatenate(sumas)
 
 
-# ---------------------------------------------------------------------------
-# C1: G como variable mixta
-# ---------------------------------------------------------------------------
 def c1_masa_en_cero(df_estable, P, params):
     validas = df_estable.dropna(subset=["cache_hit", "gpu_ms"])
     assert ((validas.gpu_ms == 0) == (validas.cache_hit == 1)).all()   # G = 0 solo cuando hay caché
@@ -109,14 +106,12 @@ def c1_momentos(c1, c2, P):
     return {"E_mv": E_mv, "V_mv": V_mv, "E_mm": E_mm, "V_mm": V_mm, "EG": EG, "EG_lo": EG_lo, "EG_hi": EG_hi, "tabla_C1": tabla}
 
 
-# ---------------------------------------------------------------------------
-# C2: máxima verosimilitud para la parte continua
-# ---------------------------------------------------------------------------
 def c2_emv(G_c, P):
     m_c, v_c = G_c.mean(), G_c.var(ddof=1)
     # método de momentos (también sirve como punto de partida del optimizador)
     k_mm, th_mm = m_c**2 / v_c, v_c / m_c
-    s_mm = np.sqrt(np.log(1 + v_c / m_c**2)); mu_mm = np.log(m_c) - s_mm**2 / 2
+    s_mm = np.sqrt(np.log(1 + v_c / m_c**2))
+    mu_mm = np.log(m_c) - s_mm**2 / 2
 
     (k_mv, th_mv), ee_gam, ll_gam = ajustar_emv(nll_gamma, G_c, [k_mm, th_mm], [True, True])
     (mu_mv, s_mv), ee_ln, ll_ln = ajustar_emv(nll_lognorm, G_c, [mu_mm, s_mm], [False, True])
@@ -203,7 +198,8 @@ def figura_2(c1, c2, ruta):
     k_mv, th_mv, s_mv, mu_mv = c2["k_mv"], c2["th_mv"], c2["s_mv"], c2["mu_mv"]
     fig, ax = plt.subplots(1, 3, figsize=(16, 4.8))
     xs = np.linspace(0, np.quantile(G_todas, 0.995), 600)
-    ecdf_x = np.sort(G_todas); ecdf_y = np.arange(1, len(ecdf_x) + 1) / len(ecdf_x)
+    ecdf_x = np.sort(G_todas)
+    ecdf_y = np.arange(1, len(ecdf_x) + 1) / len(ecdf_x)
     ax[0].step(ecdf_x, ecdf_y, where="post", color="tab:blue", label="CDF empírica")
     ax[0].plot(xs, h_hat + (1 - h_hat) * stats.gamma.cdf(xs, k_mv, scale=th_mv), "k--", label="Modelo mixto: h + (1-h)·Gamma")
     ax[0].annotate(f"salto de tamaño h = {h_hat:.3f}", xy=(0, h_hat), xytext=(60, 0.25), arrowprops=dict(arrowstyle="->"))
@@ -220,7 +216,8 @@ def figura_2(c1, c2, ruta):
     ax[2].plot(lim, lim, "k:", label="y = x")
     ax[2].set(title="(c) Gráfico Q-Q", xlabel="Cuantil teórico (ms)", ylabel="Cuantil observado (ms)")
     for a in ax:
-        a.legend(fontsize=8); a.grid(alpha=0.3)
+        a.legend(fontsize=8)
+        a.grid(alpha=0.3)
     fig.suptitle("Figura 2. G es una variable mixta: un salto en 0 (caché) más una parte continua asimétrica", y=1.02)
     fig.text(0.01, -0.06, "El salto de la CDF en 0 es la proporción de respuestas desde caché. La parte continua es asimétrica a la derecha: la Gamma la sigue "
              "en el centro, pero se separa en la cola alta (panel c),\nporque en realidad es una mezcla de imágenes de distintos tamaños.", fontsize=9)
@@ -229,9 +226,6 @@ def figura_2(c1, c2, ruta):
     plt.show()
 
 
-# ---------------------------------------------------------------------------
-# C3: tiempo de red
-# ---------------------------------------------------------------------------
 def c3_normalidad(df_estable):
     red = df_estable.red_ms.dropna().to_numpy()
     n_red = len(red)
@@ -253,7 +247,9 @@ def c3_gamma_desplazada(c3n, params):
     red, m_r, s_r = c3n["red"], c3n["m_r"], c3n["s_r"]
     gam_r = stats.skew(red)
     # valores iniciales por momentos (la asimetría de una Gamma es 2/raiz(k))
-    k0 = 4 / gam_r**2; th0 = s_r / np.sqrt(k0); loc0 = min(m_r - k0 * th0, red.min() - 0.5)
+    k0 = 4 / gam_r**2
+    th0 = s_r / np.sqrt(k0)
+    loc0 = min(m_r - k0 * th0, red.min() - 0.5)
     # loc = min(red) - exp(u0) asegura que loc quede por debajo del mínimo
     u0 = [np.log(red.min() - loc0), np.log(k0), np.log(th0)]
     a_nat = lambda u: [red.min() - np.exp(u[0]), np.exp(u[1]), np.exp(u[2])]
@@ -287,7 +283,8 @@ def c3_colas(c3n, c3g, P):
     q999 = 0.999
     orden = np.sort(red)
     # IC exacto del percentil: la cantidad de datos por debajo del percentil real es Binomial(n, q)
-    i_inf = int(stats.binom.ppf(P.alpha / 2, n_red, q999)); i_sup = int(stats.binom.ppf(1 - P.alpha / 2, n_red, q999)) + 1
+    i_inf = int(stats.binom.ppf(P.alpha / 2, n_red, q999))
+    i_sup = int(stats.binom.ppf(1 - P.alpha / 2, n_red, q999)) + 1
     p999_emp = np.quantile(red, q999)
     zq = stats.norm.ppf(q999)
     p999_norm = m_r + zq * s_r
@@ -295,8 +292,10 @@ def c3_colas(c3n, c3g, P):
     f_q = lambda p: p[0] + stats.gamma.ppf(q999, p[1], scale=p[2])
     theta_r = np.array([loc_r, k_r, th_r])
     # método delta con el gradiente numérico del percentil
-    grad = np.array([(f_q(theta_r + e) - f_q(theta_r - e)) / (2 * e[i]) for i, e in enumerate(np.eye(3) * 1e-5 * np.maximum(np.abs(theta_r), 1))])
-    p999_gam = f_q(theta_r); ee_gam_q = np.sqrt(grad @ cov_r @ grad)
+    pasos = np.eye(3) * 1e-5 * np.maximum(np.abs(theta_r), 1)
+    grad = np.array([(f_q(theta_r + paso) - f_q(theta_r - paso)) / (2 * paso[i]) for i, paso in enumerate(pasos)])
+    p999_gam = f_q(theta_r)
+    ee_gam_q = np.sqrt(grad @ cov_r @ grad)
     ic_red = [orden[i_inf - 1], orden[min(i_sup, n_red) - 1]]
     z = P.z_conf
     print(f"Percentil 99.9 % (IC {P.conf:.0%}):")
@@ -331,7 +330,8 @@ def figura_3(c3n, c3g, P, ruta):
     ax[2].set(title="(c) Cola derecha: P(red > x)", xlabel="x (ms)", ylabel="P(red > x), escala log",
               xlim=(np.median(red), lim[1]), ylim=(0.5 / n_red, 1))
     for a in ax:
-        a.legend(fontsize=8); a.grid(alpha=0.3)
+        a.legend(fontsize=8)
+        a.grid(alpha=0.3)
     # el título y el pie dependen de lo que digan las pruebas de normalidad de c3_normalidad
     if min(c3n["p_dagostino"], c3n["p_jarque_bera"]) > P.alpha:
         titulo = "Figura 3. El tiempo de red se ajusta bien a una distribución normal"
@@ -348,9 +348,6 @@ def figura_3(c3n, c3g, P, ruta):
     plt.show()
 
 
-# ---------------------------------------------------------------------------
-# C4: suma de N tiempos de GPU
-# ---------------------------------------------------------------------------
 def c4_suma_gpu(G_c, df_estable, c2, P, rng):
     """P(T_N > N(m + 15)) con TLC, Gamma, Edgeworth, simulación y bloques reales, para N = 10 a 20."""
     m_hat, s_hat, gam_hat = G_c.mean(), G_c.std(ddof=1), stats.skew(G_c)
@@ -363,14 +360,14 @@ def c4_suma_gpu(G_c, df_estable, c2, P, rng):
         gamma_exacta = stats.gamma.sf(umbral, n_ * k_mm, scale=th_mm)
         edgeworth = stats.norm.sf(z) + stats.norm.pdf(z) * gam_hat / (6 * np.sqrt(n_)) * (z**2 - 1)
         sim = (rng.choice(G_c, size=(R_MC, n_)).sum(axis=1) > umbral).mean()
-        sb = bloques_reales(df_estable, n_)
+        sumas = bloques_reales(df_estable, n_)
         return {"N": n_, "TLC": tlc, "Gamma exacta": gamma_exacta, "Edgeworth": edgeworth,
-                "Simulación (remuestreo)": sim, "Bloques reales": (sb > umbral).mean(), "n bloques": len(sb)}
+                "Simulación (remuestreo)": sim, "Bloques reales": (sumas > umbral).mean(), "n bloques": len(sumas)}
 
     N = P.N
     res_N = prob_C4(N)
-    sb = bloques_reales(df_estable, N)
-    pb, pb_lo, pb_hi = ic_wilson((sb > N * (m_hat + 15)).sum(), len(sb), P.conf)
+    sumas = bloques_reales(df_estable, N)
+    pb, pb_lo, pb_hi = ic_wilson((sumas > N * (m_hat + 15)).sum(), len(sumas), P.conf)
     ee_sim = np.sqrt(res_N["Simulación (remuestreo)"] * (1 - res_N["Simulación (remuestreo)"]) / R_MC)
 
     tabla_C4 = pd.DataFrame([res_N if n_ == N else prob_C4(n_) for n_ in range(10, 21)]).set_index("N")
@@ -380,7 +377,7 @@ def c4_suma_gpu(G_c, df_estable, c2, P, rng):
     print(f"N = {N}, m = {m_hat:.3f} ms, umbral = {N*(m_hat+15):.1f} ms")
     print(f"  TLC = {res_N['TLC']:.5f}, Gamma = {res_N['Gamma exacta']:.5f}, Edgeworth = {res_N['Edgeworth']:.5f}, "
           f"simulación = {res_N['Simulación (remuestreo)']:.5f} ± {ee_sim:.5f}")
-    print(f"  bloques reales: {res_N['Bloques reales']:.4f}, IC Wilson [{pb_lo:.4f}, {pb_hi:.4f}] con {len(sb)} bloques")
+    print(f"  bloques reales: {res_N['Bloques reales']:.4f}, IC Wilson [{pb_lo:.4f}, {pb_hi:.4f}] con {len(sumas)} bloques")
     print(f"Error medio frente a la simulación (N = 10 a 20): TLC {tabla_C4['error TLC (%)'].abs().mean():.1f} %, "
           f"Gamma {tabla_C4['error Gamma exacta (%)'].abs().mean():.1f} %, Edgeworth {tabla_C4['error Edgeworth (%)'].abs().mean():.1f} %")
     print(f"Asimetría de G = {gam_hat:.3f}; la Gamma de momentos supone 2/raiz(k) = {2/np.sqrt(k_mm):.3f}")

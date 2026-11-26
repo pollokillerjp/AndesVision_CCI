@@ -37,9 +37,6 @@ def f6_datos(d, dur, tau):
             "cache": cache_d.eq(1), "violaciones": lat.gt(tau)}
 
 
-# ---------------------------------------------------------------------------
-# F1: distribución muestral de la media
-# ---------------------------------------------------------------------------
 def f1_distribucion_muestral(df_estable, P, rng):
     """La población es la latencia del régimen estable; se muestrea con reemplazo."""
     poblacion = df_estable["latencia_ms"].dropna().to_numpy()
@@ -104,9 +101,6 @@ def figura_7(F1, ruta):
     plt.show()
 
 
-# ---------------------------------------------------------------------------
-# F2: IC de la latencia media
-# ---------------------------------------------------------------------------
 def f2_ic_latencia(df_estable, P):
     """IC t clásico contra IC por medias de lotes (los lotes se arman dentro de cada tramo)."""
     lat_t = df_estable.sort_values("t_llegada_s")["latencia_ms"].dropna().to_numpy()
@@ -131,9 +125,6 @@ def f2_ic_latencia(df_estable, P):
             "m_bm": m_bm, "lo_bm": lo_bm, "hi_bm": hi_bm}
 
 
-# ---------------------------------------------------------------------------
-# F3: versión B contra A
-# ---------------------------------------------------------------------------
 def f3_comparar_versiones(df_estable, P, params):
     """Tres diferencias B - A con Bonferroni (cada IC al nivel 1 - alpha/3)."""
     df_A = df_estable[df_estable["version"] == "A"]
@@ -167,9 +158,6 @@ def f3_comparar_versiones(df_estable, P, params):
     return {"f3": f3, "tabla_F3": tabla_F3, "smd": smd, "conf_bonf": conf_bonf, "gA": gA, "gB": gB}
 
 
-# ---------------------------------------------------------------------------
-# F4: cobertura de Wald y Wilson
-# ---------------------------------------------------------------------------
 def f4_cobertura(P, rng, params):
     filas = []
     for n in NS_F4:
@@ -206,9 +194,6 @@ def figura_8(F4, P, ruta):
     plt.show()
 
 
-# ---------------------------------------------------------------------------
-# F5: tamaño de muestra
-# ---------------------------------------------------------------------------
 def f5_tamano_muestra(F3, P, rng):
     """n por versión para que el semiancho de F3(i) sea <= 1 ms: n >= z^2 (sA^2 + sB^2)."""
     gA, gB, conf_bonf = F3["gA"], F3["gB"], F3["conf_bonf"]
@@ -229,9 +214,6 @@ def f5_tamano_muestra(F3, P, rng):
     return {"z_bonf": z_bonf, "n_req": n_req, "semis": semis}
 
 
-# ---------------------------------------------------------------------------
-# F6: validación
-# ---------------------------------------------------------------------------
 def f6_validacion(ruta_datos, df_estable, dur_estable, P):
     """Limpia solicitudes_validacion.csv igual que en A1 y compara cada parámetro con la ventana original."""
     df_val = limpiar(pd.read_csv(ruta_datos / "solicitudes_validacion.csv"))

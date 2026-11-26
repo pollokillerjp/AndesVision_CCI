@@ -50,9 +50,6 @@ def breusch_pagan(residuos, X_):
     return LM, stats.chi2.sf(LM, X_.shape[1] - 1)
 
 
-# ---------------------------------------------------------------------------
-# D1: tamaño y caché
-# ---------------------------------------------------------------------------
 def d1_tamano_cache(df_estable, P, params):
     d1 = df_estable.dropna(subset=["tam_kb", "cache_hit"]).copy()
     # right=False: si el tamaño es igual a un corte, queda en la clase de arriba
@@ -72,8 +69,9 @@ def d1_tamano_cache(df_estable, P, params):
     tab = pd.crosstab(d1.clase, d1.cache).to_numpy()
     chi2, p_ind_tam, gl, esperados = stats.chi2_contingency(tab)
     V = np.sqrt(chi2 / (tab.sum() * (min(tab.shape) - 1)))
-    a_, b_ = d1[d1.clase == "pequeña"].cache, d1[d1.clase == "grande"].cache
-    dif = a_.mean() - b_.mean(); ee = np.sqrt(a_.mean()*(1-a_.mean())/len(a_) + b_.mean()*(1-b_.mean())/len(b_))
+    cache_peq, cache_gra = d1[d1.clase == "pequeña"].cache, d1[d1.clase == "grande"].cache
+    dif = cache_peq.mean() - cache_gra.mean()
+    ee = np.sqrt(cache_peq.mean()*(1-cache_peq.mean())/len(cache_peq) + cache_gra.mean()*(1-cache_gra.mean())/len(cache_gra))
 
     print(f"Clases: pequeña < {P.t1} KB <= mediana < {P.t2} KB <= grande")
     print(f"Independencia: chi-cuadrado = {chi2:.1f} con {gl} gl, p = {p_ind_tam:.3g}, V de Cramér = {V:.3f}")
@@ -111,9 +109,6 @@ def figura_4(D1, P, ruta):
     plt.show()
 
 
-# ---------------------------------------------------------------------------
-# D2: esperanza condicional
-# ---------------------------------------------------------------------------
 def d2_esperanza_condicional(df_estable, P):
     d2 = df_estable.dropna(subset=["tam_kb", "cache_hit", "gpu_ms"]).copy()
     d2["clase"] = pd.cut(d2.tam_kb, [-np.inf, P.t1, P.t2, np.inf], right=False, labels=CLASES)
@@ -140,9 +135,6 @@ def d2_esperanza_condicional(df_estable, P):
             "EG_tam": EG_tam, "EG_tam_nc": EG_tam_nc, "tabla_D2": tabla_D2}
 
 
-# ---------------------------------------------------------------------------
-# D3: regresión
-# ---------------------------------------------------------------------------
 def d3_mco(validas, P):
     """Mínimos cuadrados resolviendo (X'X) beta = X'y."""
     d3 = validas[(validas.cache_hit == 0) & validas.tam_kb.notna()]
@@ -193,7 +185,8 @@ def d3_correccion(mco, c2_cond, P, params):
             beta_w = nuevo
             break
         beta_w = nuevo
-    mu = X @ beta_w; w = 1 / mu**2
+    mu = X @ beta_w
+    w = 1 / mu**2
     phi = (w * (y - mu) ** 2).sum() / (n_reg - 2)    # estimación de CV^2
     cov_wls = phi * np.linalg.inv(X.T @ (w[:, None] * X))
     ee_wls = np.sqrt(np.diag(cov_wls))
@@ -247,7 +240,8 @@ def figura_5(mco, resid, corr, D2, rng, ruta):
     ax[2].axhline(0, color="red", lw=1)
     ax[2].set(title="(c) Residuos ponderados: ancho constante", xlabel="Valor ajustado (ms)", ylabel="Residuo ponderado √w·e")
     for a in ax:
-        a.legend(fontsize=8); a.grid(alpha=0.3)
+        a.legend(fontsize=8)
+        a.grid(alpha=0.3)
     fig.suptitle("Figura 5. El tiempo de GPU crece linealmente con el tamaño, pero su dispersión crece con la media", y=1.02)
     fig.text(0.01, -0.06, "La recta describe bien la media (coincide con la curva no paramétrica), pero los residuos de MCO se abren en abanico. "
              "Con pesos w = 1/μ² el abanico desaparece (panel c),\ncomo predice un tiempo de cómputo con coeficiente de variación constante.", fontsize=9)
@@ -256,14 +250,12 @@ def figura_5(mco, resid, corr, D2, rng, ruta):
     plt.show()
 
 
-# ---------------------------------------------------------------------------
-# D4: covarianza y correlación
-# ---------------------------------------------------------------------------
 def d4_correlacion(mco, D2, P):
     x, y, n_reg, beta, R2 = mco["x"], mco["y"], mco["n_reg"], mco["beta"], mco["R2"]
     cov_xy = np.cov(x, y, ddof=1)[0, 1]
     r_xy = np.corrcoef(x, y)[0, 1]
-    zf = np.arctanh(r_xy); ee_z = 1 / np.sqrt(n_reg - 3)          # transformación z de Fisher
+    zf = np.arctanh(r_xy)
+    ee_z = 1 / np.sqrt(n_reg - 3)  # transformación z de Fisher
     r_lo, r_hi = np.tanh(zf - P.z_conf * ee_z), np.tanh(zf + P.z_conf * ee_z)
     rho_s = stats.spearmanr(x, y)[0]
     eta2_nc = D2["tabla_D2"].loc["G (sin caché) | clase", "fracción explicada"]

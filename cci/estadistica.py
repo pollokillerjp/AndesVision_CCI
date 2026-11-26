@@ -49,11 +49,16 @@ def ic_dif_welch(xA, xB, conf):
 
 def hessiano_numerico(f, x0, paso=1e-4):
     """Hessiano por diferencias centrales. Su inversa da la covarianza aproximada del EMV."""
-    x0 = np.asarray(x0, float); d = len(x0); H = np.zeros((d, d))
+    x0 = np.asarray(x0, float)
+    d = len(x0)
+    H = np.zeros((d, d))
     h = paso * np.maximum(np.abs(x0), 1.0)
     for i in range(d):
         for j in range(d):
-            ei = np.zeros(d); ej = np.zeros(d); ei[i] = h[i]; ej[j] = h[j]
+            ei = np.zeros(d)
+            ej = np.zeros(d)
+            ei[i] = h[i]
+            ej[j] = h[j]
             H[i, j] = (f(x0 + ei + ej) - f(x0 + ei - ej) - f(x0 - ei + ej) + f(x0 - ei - ej)) / (4 * h[i] * h[j])
     return H
 

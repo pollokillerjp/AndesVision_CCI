@@ -22,9 +22,6 @@ POLITICAS = {
 }
 
 
-# ---------------------------------------------------------------------------
-# funciones de apoyo
-# ---------------------------------------------------------------------------
 def detectar_inconsistencias(d):
     """Marca en cada fila las reglas físicas que no se cumplen (una fila puede tener varias)."""
     # algunos tamaños están en bytes: al dividir por 1024 quedan en rango y con dos decimales
@@ -94,7 +91,8 @@ def prueba_dispersion(tiempos, inicio, fin, ancho):
 
 def ll_poisson(n, duracion):
     """Log-verosimilitud de un tramo Poisson con n llegadas, evaluada en lambda = n/duracion (sin constantes)."""
-    n = np.asarray(n, float); duracion = np.asarray(duracion, float)
+    n = np.asarray(n, float)
+    duracion = np.asarray(duracion, float)
     with np.errstate(divide="ignore", invalid="ignore"):
         return np.where(n > 0, n * np.log(n / duracion) - n, 0.0)
 
@@ -159,9 +157,6 @@ def describir(x):
                       "asimetría": stats.skew(x), "curtosis (exceso)": stats.kurtosis(x)})
 
 
-# ---------------------------------------------------------------------------
-# A1: auditoría y limpieza
-# ---------------------------------------------------------------------------
 def leer_solicitudes(ruta_datos):
     crudo = pd.read_csv(ruta_datos / "solicitudes.csv")
     print(f"solicitudes.csv: {len(crudo)} filas")
@@ -211,9 +206,6 @@ def a1_limpiar(crudo):
     return {"df": df, "comparacion_tam": comparacion_tam, "antes_despues": antes_despues}
 
 
-# ---------------------------------------------------------------------------
-# A2: regímenes
-# ---------------------------------------------------------------------------
 def a2_detectar_cambios(df):
     t_llegadas = df.t_llegada_s.to_numpy()
     n_total = len(t_llegadas)
@@ -262,7 +254,8 @@ def a2_detectar_cambios(df):
     tabla_resolucion = pd.DataFrame(sens)
 
     # instantes con logL a menos de 2 unidades del máximo, moviendo un corte y dejando fijo el otro
-    N2 = np.searchsorted(t_llegadas, TAU2); N1 = np.searchsorted(t_llegadas, TAU1)
+    N2 = np.searchsorted(t_llegadas, TAU2)
+    N1 = np.searchsorted(t_llegadas, TAU1)
     perfil1 = ll_poisson(N_ANTES, REJILLA) + ll_poisson(N2 - N_ANTES, TAU2 - REJILLA) + ll_poisson(n_total - N2, T_VENTANA - TAU2)
     perfil2 = ll_poisson(N1, TAU1) + ll_poisson(N_ANTES - N1, REJILLA - TAU1) + ll_poisson(n_total - N_ANTES, T_VENTANA - REJILLA)
     ok1 = REJILLA[(REJILLA < TAU2) & (perfil1 >= ll_2 - 2)]
@@ -292,8 +285,9 @@ def a2_definir_regimenes(df, cambios):
     df_reg2 = df[df.regimen == "pico"].copy()
 
     seg_estable_1, seg_pico, seg_estable_2 = (df[df.segmento == s] for s in ["estable_1", "pico", "estable_2"])
-    ia1 = np.diff(seg_estable_1.t_llegada_s.to_numpy()); ia3 = np.diff(seg_estable_2.t_llegada_s.to_numpy())
-    p_ks_tramos = stats.ks_2samp(ia1, ia3).pvalue
+    entre_llegadas_1 = np.diff(seg_estable_1.t_llegada_s.to_numpy())
+    entre_llegadas_2 = np.diff(seg_estable_2.t_llegada_s.to_numpy())
+    p_ks_tramos = stats.ks_2samp(entre_llegadas_1, entre_llegadas_2).pvalue
     comp_estables = comparar(seg_estable_1, seg_estable_2, TAU1, T_VENTANA - TAU2)
     comp_estable_pico = comparar(df_estable, seg_pico, TAU1 + (T_VENTANA - TAU2), TAU2 - TAU1)
     comparacion = pd.DataFrame({
@@ -319,9 +313,6 @@ def exportar_limpio(df, ruta):
     df.to_csv(ruta / "solicitudes_limpio.csv", index=False)
 
 
-# ---------------------------------------------------------------------------
-# A3: descriptivos y Figura 1
-# ---------------------------------------------------------------------------
 def a3_descriptivos(df):
     """Descriptivos por variable, régimen y versión. Cada uno usa solo los valores válidos de su columna."""
     variables = {

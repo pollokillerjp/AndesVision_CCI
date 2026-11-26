@@ -14,9 +14,6 @@ CANDIDATOS_C = range(1, 6)    # cantidades de GPUs que se prueban
 WARMUP = 180                  # segundos iniciales que se descartan en cada réplica
 
 
-# ---------------------------------------------------------------------------
-# ajuste de los parámetros del simulador
-# ---------------------------------------------------------------------------
 def mle_gamma(x):
     """EMV de una Gamma resolviendo log(k) - digamma(k) = log(media) - media(log x)."""
     x = np.asarray(x, float)
@@ -67,9 +64,6 @@ def muestras_g(d):
             "red": d.red_ms.dropna().to_numpy()}
 
 
-# ---------------------------------------------------------------------------
-# simulador
-# ---------------------------------------------------------------------------
 def simular(c, lam, p, T, rng_rep, warmup=300.0, muestras=None, modelo="estructural"):
     """Simula la cola FIFO con c GPUs durante T segundos y devuelve las latencias (ms)
     de las solicitudes que llegan después del calentamiento.
@@ -127,13 +121,13 @@ def mmc(c, param_g, EG_nc, red_media, P):
     C = cola / (sum(a**k / special.factorial(k) for k in range(c)) + cola)   # probabilidad de tener que esperar
     beta = c * mu - lam_nc                                 # si espera, la espera es exponencial con tasa beta
     tt = (P.tau - red_media) / 1000                        # tiempo que queda para espera + servicio
-    suma = np.exp(-mu*tt) * (1 + mu*tt) if abs(beta - mu) < 1e-9 else (beta*np.exp(-mu*tt) - mu*np.exp(-beta*tt)) / (beta - mu)
+    if abs(beta - mu) < 1e-9:
+        suma = np.exp(-mu * tt) * (1 + mu * tt)
+    else:
+        suma = (beta * np.exp(-mu * tt) - mu * np.exp(-beta * tt)) / (beta - mu)
     return (1 - param_g["h"]) * ((1 - C) * np.exp(-mu * tt) + C * suma)
 
 
-# ---------------------------------------------------------------------------
-# G1 a G3
-# ---------------------------------------------------------------------------
 def g0_ajustar(df_estable, dur_estable):
     param_g = ajustar(df_estable, dur_estable)
     EG_nc = param_g["k"] * param_g["theta"]                       # E[G | no caché]
@@ -190,9 +184,9 @@ def g2_capacidad(G0, G1, P, rng, ruta_g, replicas=40, horizonte=2700):
             filas_g.append((c, rho, np.nan, np.nan, np.nan, 0))
             continue
         # 2700 s menos 180 de calentamiento dejan 42 minutos útiles por réplica
-        pro = replicar(c, param_g, G1["mues_g"], replicas, horizonte, G1["modelo_g"], P, rng)
-        mg, lo_g, hi_g = ic_media_t(pro, P.conf)
-        filas_g.append((c, rho, mg, max(0, lo_g), min(1, hi_g), len(pro)))
+        proporciones = replicar(c, param_g, G1["mues_g"], replicas, horizonte, G1["modelo_g"], P, rng)
+        p_media, p_inf, p_sup = ic_media_t(proporciones, P.conf)
+        filas_g.append((c, rho, p_media, max(0, p_inf), min(1, p_sup), len(proporciones)))
     g2 = pd.DataFrame(filas_g, columns=["GPUs", "rho", "p", "lo", "hi", "R"]).set_index("GPUs")
     g2.to_csv(ruta_g / "G2_escenario_grupo.csv")
     c_g = next(iter(g2.index[g2.hi.le(P.eps)]), None)
@@ -225,17 +219,17 @@ def g3_incertidumbre(df_estable, dur_estable, G0, G1, G2, P, rng, B=100):
     conteo_c = {}
     for _ in range(B):
         muestra = df_estable.iloc[rng.integers(0, len(df_estable), len(df_estable))]
-        pb_g = ajustar(muestra, dur_estable, rng.poisson(len(df_estable)), cortes_tam=param_g["cortes_tam"])
-        marcas_b = muestras_g(muestra)
-        numero = None
+        param_boot = ajustar(muestra, dur_estable, rng.poisson(len(df_estable)), cortes_tam=param_g["cortes_tam"])
+        muestras_boot = muestras_g(muestra)
+        c_min = None
         for c in CANDIDATOS_C:
-            if P.g * pb_g["lam"] * (1 - pb_g["h"]) * pb_g["k"] * pb_g["theta"] / (1000 * c) >= 1:
+            if P.g * param_boot["lam"] * (1 - param_boot["h"]) * param_boot["k"] * param_boot["theta"] / (1000 * c) >= 1:
                 continue
-            prop_b = replicar(c, pb_g, marcas_b, 8, 1800, G1["modelo_g"], P, rng)
-            if prop_b.mean() <= P.eps:
-                numero = c
+            prop_boot = replicar(c, param_boot, muestras_boot, 8, 1800, G1["modelo_g"], P, rng)
+            if prop_boot.mean() <= P.eps:
+                c_min = c
                 break
-        clave = str(numero) if numero is not None else ">5"
+        clave = str(c_min) if c_min is not None else ">5"
         conteo_c[clave] = conteo_c.get(clave, 0) + 1
 
     red_media = df_estable.red_ms.mean()

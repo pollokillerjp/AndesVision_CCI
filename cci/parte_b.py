@@ -86,19 +86,19 @@ def b2_bloques(df, rng):
             sin_faltantes = ~np.isnan(bloques_de_100).any(axis=1)
             bloques_validos = bloques_de_100[sin_faltantes]
             grupos.extend((bloques_validos > 1).sum(axis=1))
-        x_b = np.asarray(grupos)
-        bloques[reg] = x_b
-        pb = x_b.mean() / 100
-        esperada = 100 * pb * (1 - pb)                          # varianza si fuera binomial
+        con_reintento = np.asarray(grupos)
+        bloques[reg] = con_reintento
+        p_bloque = con_reintento.mean() / 100
+        esperada = 100 * p_bloque * (1 - p_bloque)                          # varianza si fuera binomial
         # se simulan 4000 juegos de bloques binomiales para ver qué tan rara es la varianza observada
-        simulados = rng.binomial(100, pb, (4000, len(x_b)))
+        simulados = rng.binomial(100, p_bloque, (4000, len(con_reintento)))
         pboot = simulados.mean(axis=1) / 100
-        obs = x_b.var(ddof=1) / esperada
+        obs = con_reintento.var(ddof=1) / esperada
         var_binomial_sim = 100 * pboot * (1 - pboot)
         dispersion = simulados.var(axis=1, ddof=1) / var_binomial_sim
         extremos = np.sum(abs(dispersion - 1) >= abs(obs - 1))
         p_b2 = (1 + extremos) / (len(dispersion) + 1)
-        filas_b2.append((reg, len(x_b), pb, x_b.var(ddof=1), esperada, p_b2))
+        filas_b2.append((reg, len(con_reintento), p_bloque, con_reintento.var(ddof=1), esperada, p_b2))
     tabla_b2 = pd.DataFrame(filas_b2, columns=["régimen", "bloques", "p", "var observada", "var binomial", "p MC"])
     return {"bloques": bloques, "tabla_b2": tabla_b2}
 
