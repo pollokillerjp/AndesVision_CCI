@@ -167,7 +167,7 @@ def figura_g1(G1, ruta_g):
     for k, v in G1["g1"].items():
         xx = np.linspace(15, 320, 250)
         ax.plot(xx, 1 - np.searchsorted(np.sort(v), xx, side="right") / len(v), label=k)
-    ax.set(xlabel="Latencia (ms)", ylabel="P(L > x)", yscale="log", title="G1 · Cola observada y simulada con 2 GPUs")
+    ax.set(xlabel="Latencia (ms)", ylabel="P(L > x)", yscale="log", title="Validación con 2 GPUs: cola observada y simulada")
     ax.legend()
     fig.tight_layout()
     fig.savefig(ruta_g / "figuraG1_validacion.png", dpi=150)
@@ -202,7 +202,7 @@ def figura_9(G2, P, ruta_g):
                 fmt="o-", capsize=4, label=f"IC t {P.conf:.0%}")
     ax.axhline(100 * P.eps, color="firebrick", ls="--", label="SLO")
     ax.set(xlabel="Número de GPUs", ylabel=f"P(L > {P.tau} ms) (%)", xticks=list(CANDIDATOS_C),
-           title=f"Figura 9 · Tráfico × {P.g:.1f}")
+           title=f"Figura 9. P(L > τ) según el número de GPUs (tráfico x{P.g:.1f})")
     for c in g2.index[g2.R.eq(0)]:
         ax.text(c, 100 * P.eps, "ρ ≥ 1", ha="center", va="bottom")
     ax.set_yscale('log')
