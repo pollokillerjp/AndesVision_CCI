@@ -2,7 +2,7 @@
 
 Ciencia Computacional Intermedia, 2026-3. Docente: Ph.D. Ricardo Andrés Fonseca Perdomo.
 
-Integrantes: Juan Pablo Vásquez y Juan Sebastián García.
+Integrantes: Juan Pablo Vásquez y Juan Sebastián García y Uriel rodriguez
 S = C1 + C2 = 2159739251.
 
 ## Cómo ejecutar
