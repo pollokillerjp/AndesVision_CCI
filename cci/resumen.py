@@ -1,4 +1,4 @@
-"""Resumen consolidado: reúne las cifras principales de cada parte en `resumen_consolidado.json`."""
+"""Junta las cifras principales de todas las partes en resumen_consolidado.json."""
 import json
 
 import numpy as np
@@ -8,8 +8,6 @@ from .estadistica import a_nativo
 
 
 def construir_resumen(R, P, ruta):
-    """Arma el diccionario de cifras del informe a partir de los resultados de cada ítem (diccionario `R`)
-    y lo guarda en `ruta/resumen_consolidado.json`."""
     A1, A1L, A2, REG = R["A1"], R["A1L"], R["A2"], R["REG"]
     df, df_estable, df_reg2 = A1L["df"], REG["df_estable"], REG["df_reg2"]
     mco, corr = R["D3_mco"], R["D3_corr"]
@@ -42,5 +40,4 @@ def construir_resumen(R, P, ruta):
     resumen_final = a_nativo(resumen_final)
     (ruta / "resumen_consolidado.json").write_text(json.dumps(resumen_final, ensure_ascii=False, indent=2, allow_nan=False),
                                                    encoding="utf8")
-    print("Guardado resumen_consolidado.json")
     return resumen_final
